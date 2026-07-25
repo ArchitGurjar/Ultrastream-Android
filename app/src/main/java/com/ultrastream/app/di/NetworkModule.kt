@@ -56,7 +56,7 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient, moshi: Moshi): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://v3-cinemeta.strem.io/") // ✅ वास्तविक और हमेशा वैलिड बेस URL
+            .baseUrl("https://v3-cinemeta.strem.io/")
             .client(okHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()

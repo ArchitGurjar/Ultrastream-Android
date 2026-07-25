@@ -86,16 +86,8 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
 
     private var playerListener: Player.Listener? = null
     private var positionJob: Job? = null
-    private var currentContext: Context? = null
-    private var currentStream: StreamItem? = null
-    private var currentTitle: String? = null
 
     fun initializePlayer(context: Context, stream: StreamItem, title: String, externalSubtitle: Subtitle? = null) {
-        currentContext = context
-        currentStream = stream
-        currentTitle = title
-
-        // ✅ Volume fix: initialize with current system volume
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -114,50 +106,53 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
                     .setTrackSelector(trackSelector)
                     .build()
 
-                val dataSourceFactory = createDataSourceFactory()
+                val dataSourceFactory = DefaultHttpDataSource.Factory()
+                    .setUserAgent("UltraStream/1.0 (Android)")
+                    .setDefaultRequestProperties(mapOf("Referer" to "https://ultrastream.app/"))
+                    .setConnectTimeoutMs(30_000)
+                    .setReadTimeoutMs(60_000)
+
                 val mediaItemBuilder = MediaItem.Builder()
                     .setUri(Uri.parse(url))
                     .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
 
-                // Existing subtitles from stream
-                stream.subtitles?.let { subs ->
-                    val configs = subs.mapNotNull { subtitle ->
-                        val subUriStr = subtitle.url ?: return@mapNotNull null
-                        val mimeType = when {
-                            subUriStr.endsWith(".vtt", ignoreCase = true) -> "text/vtt"
-                            subUriStr.endsWith(".srt", ignoreCase = true) -> "application/x-subrip"
-                            else -> "text/vtt"
-                        }
-                        MediaItem.SubtitleConfiguration.Builder(Uri.parse(subUriStr))
-                            .setMimeType(mimeType)
-                            .setLanguage(subtitle.lang ?: "und")
-                            .setLabel(subtitle.name ?: subtitle.lang ?: "Subtitle")
-                            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                            .build()
-                    }
-                    if (configs.isNotEmpty()) {
-                        mediaItemBuilder.setSubtitleConfigurations(configs)
+                val configs = mutableListOf<MediaItem.SubtitleConfiguration>()
+                
+                stream.subtitles?.forEach { subtitle ->
+                    subtitle.url?.let { subUrl ->
+                        configs.add(
+                            MediaItem.SubtitleConfiguration.Builder(Uri.parse(subUrl))
+                                .setMimeType("text/vtt")
+                                .setLanguage(subtitle.lang ?: "und")
+                                .setLabel(subtitle.name ?: subtitle.lang ?: "Subtitle")
+                                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                                .build()
+                        )
                     }
                 }
 
-                // External subtitle
                 if (externalSubtitle != null && !externalSubtitle.url.isNullOrBlank()) {
-                    val mimeType = when {
-                        externalSubtitle.url.endsWith(".vtt", ignoreCase = true) -> "text/vtt"
-                        externalSubtitle.url.endsWith(".srt", ignoreCase = true) -> "application/x-subrip"
-                        else -> "text/vtt"
-                    }
-                    val config = MediaItem.SubtitleConfiguration.Builder(Uri.parse(externalSubtitle.url))
-                        .setMimeType(mimeType)
-                        .setLanguage(externalSubtitle.lang ?: "und")
-                        .setLabel(externalSubtitle.name ?: externalSubtitle.lang ?: "External Subtitle")
-                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                        .build()
-                    mediaItemBuilder.setSubtitleConfigurations(listOf(config))
+                    configs.add(
+                        MediaItem.SubtitleConfiguration.Builder(Uri.parse(externalSubtitle.url))
+                            .setMimeType("text/vtt")
+                            .setLanguage(externalSubtitle.lang ?: "und")
+                            .setLabel(externalSubtitle.name ?: "External Subtitle")
+                            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                            .build()
+                    )
+                }
+                
+                if (configs.isNotEmpty()) {
+                    mediaItemBuilder.setSubtitleConfigurations(configs)
                 }
 
                 val mediaItem = mediaItemBuilder.build()
-                val mediaSource = createMediaSource(mediaItem, dataSourceFactory)
+                val mediaSource = when {
+                    url.contains(".m3u8") -> HlsMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+                    url.contains(".mpd") -> DashMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+                    else -> ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+                }
+
                 exoPlayer.setMediaSource(mediaSource)
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
@@ -172,20 +167,15 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
                                 _duration.value = exoPlayer.duration
                                 _isPlaying.value = exoPlayer.isPlaying
                             }
-                            Player.STATE_ENDED -> {
-                                _isPlaying.value = false
-                            }
+                            Player.STATE_ENDED -> _isPlaying.value = false
                         }
                     }
-
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         _isPlaying.value = isPlaying
                     }
-
                     override fun onPlayerError(error: PlaybackException) {
                         _error.value = error.message
                     }
-
                     override fun onTracksChanged(tracks: Tracks) {
                         val audioList = mutableListOf<AudioTrackInfo>()
                         val subtitleList = mutableListOf<SubtitleTrackInfo>()
@@ -196,42 +186,20 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
                                 C.TRACK_TYPE_AUDIO -> {
                                     for (trackIndex in 0 until trackGroup.length) {
                                         val format = trackGroup.getTrackFormat(trackIndex)
-                                        audioList.add(
-                                            AudioTrackInfo(
-                                                groupIndex = groupIndex,
-                                                trackIndex = trackIndex,
-                                                label = format.label ?: format.language ?: "Audio $trackIndex",
-                                                language = format.language ?: "und"
-                                            )
-                                        )
+                                        audioList.add(AudioTrackInfo(groupIndex, trackIndex, format.label ?: "Audio $trackIndex", format.language ?: "und"))
                                     }
                                 }
                                 C.TRACK_TYPE_TEXT -> {
                                     for (trackIndex in 0 until trackGroup.length) {
                                         val format = trackGroup.getTrackFormat(trackIndex)
-                                        subtitleList.add(
-                                            SubtitleTrackInfo(
-                                                groupIndex = groupIndex,
-                                                trackIndex = trackIndex,
-                                                label = format.label ?: format.language ?: "Subtitle $trackIndex",
-                                                language = format.language ?: "und"
-                                            )
-                                        )
+                                        subtitleList.add(SubtitleTrackInfo(groupIndex, trackIndex, format.label ?: "Subtitle $trackIndex", format.language ?: "und"))
                                     }
                                 }
                                 C.TRACK_TYPE_VIDEO -> {
                                     for (trackIndex in 0 until trackGroup.length) {
                                         val format = trackGroup.getTrackFormat(trackIndex)
-                                        val resolution = if (format.height != null && format.width != null) {
-                                            "${format.height}p"
-                                        } else null
-                                        qualityList.add(
-                                            Quality(
-                                                label = format.label ?: "Quality",
-                                                resolution = resolution,
-                                                bitrate = format.bitrate
-                                            )
-                                        )
+                                        val resolution = if (format.height != null) "${format.height}p" else null
+                                        qualityList.add(Quality(format.label ?: "Quality", resolution, format.bitrate))
                                     }
                                 }
                             }
@@ -244,82 +212,33 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
                 exoPlayer.addListener(listener)
                 playerListener = listener
 
-                positionJob?.cancel()
                 positionJob = viewModelScope.launch {
                     while (isActive) {
                         try {
                             _currentPosition.value = exoPlayer.currentPosition
-                        } catch (e: IllegalStateException) {
-                            break
-                        }
+                        } catch (e: Exception) { break }
                         delay(200)
                     }
                 }
-
             } catch (e: Exception) {
                 _error.value = e.message
             }
         }
     }
 
-    private fun createDataSourceFactory(): DataSource.Factory {
-        return DefaultHttpDataSource.Factory()
-            .setUserAgent("UltraStream/1.0 (Android)")
-            .setDefaultRequestProperties(mapOf("Referer" to "https://ultrastream.app/"))
-            .setConnectTimeoutMs(30_000)
-            .setReadTimeoutMs(60_000)
-    }
-
-    private fun createMediaSource(mediaItem: MediaItem, dataSourceFactory: DataSource.Factory): MediaSource {
-        val uri = mediaItem.localConfiguration?.uri ?: Uri.EMPTY
-        val url = uri.toString()
-        return when {
-            url.contains(".m3u8") -> HlsMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
-            url.contains(".mpd") -> DashMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
-            else -> ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
-        }
-    }
-
     fun playPause() {
-        _player.value?.let { player ->
-            if (player.isPlaying) {
-                player.pause()
-                _isPlaying.value = false
-            } else {
-                player.play()
-                _isPlaying.value = true
-            }
+        _player.value?.let {
+            if (it.isPlaying) { it.pause(); _isPlaying.value = false }
+            else { it.play(); _isPlaying.value = true }
         }
     }
-
-    fun play() {
-        _player.value?.play()
-        _isPlaying.value = true
-    }
-
-    fun pause() {
-        _player.value?.pause()
-        _isPlaying.value = false
-    }
-
-    fun skipForward(seconds: Long = 10) {
-        _player.value?.let { player ->
-            val newPos = player.currentPosition + seconds * 1000
-            player.seekTo(newPos.coerceAtMost(player.duration))
-        }
-    }
-
-    fun skipBackward(seconds: Long = 10) {
-        _player.value?.let { player ->
-            val newPos = player.currentPosition - seconds * 1000
-            player.seekTo(newPos.coerceAtLeast(0))
-        }
-    }
-
+    fun play() { _player.value?.play(); _isPlaying.value = true }
+    fun pause() { _player.value?.pause(); _isPlaying.value = false }
+    fun skipForward(seconds: Long = 10) { _player.value?.let { it.seekTo((it.currentPosition + seconds * 1000).coerceAtMost(it.duration)) } }
+    fun skipBackward(seconds: Long = 10) { _player.value?.let { it.seekTo((it.currentPosition - seconds * 1000).coerceAtLeast(0)) } }
     fun seekBy(offsetMs: Long) {
-        _player.value?.let { player ->
-            val newPos = player.currentPosition + offsetMs
-            player.seekTo(newPos.coerceIn(0, player.duration))
+        _player.value?.let {
+            it.seekTo((it.currentPosition + offsetMs).coerceIn(0, it.duration))
             viewModelScope.launch {
                 _seekMessage.value = if (offsetMs > 0) "+${offsetMs/1000}s" else "-${-offsetMs/1000}s"
                 delay(800)
@@ -327,109 +246,55 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
             }
         }
     }
-
-    fun seekTo(position: Long) {
-        _player.value?.seekTo(position.coerceIn(0, _duration.value))
-    }
-
-    fun setSpeed(speed: Float) {
-        _player.value?.setPlaybackSpeed(speed)
-        _speed.value = speed
-    }
-
-    fun setVolume(volume: Float) {
-        _player.value?.volume = volume.coerceIn(0f, 1f)
-        _volume.value = volume
-    }
-
-    fun setBrightness(brightness: Float) {
-        _brightness.value = brightness.coerceIn(-1f, 1f)
-    }
-
-    fun selectAudioTrack(info: AudioTrackInfo) {
-        val player = _player.value ?: return
-        val group = player.currentTracks.groups.getOrNull(info.groupIndex) ?: return
-        val params = player.trackSelectionParameters.buildUpon()
-            .setOverrideForType(
-                TrackSelectionOverride(group.mediaTrackGroup, listOf(info.trackIndex))
-            )
-            .build()
-        player.trackSelectionParameters = params
-    }
-
+    fun setSpeed(speed: Float) { _player.value?.setPlaybackSpeed(speed); _speed.value = speed }
+    fun setVolume(volume: Float) { _player.value?.volume = volume.coerceIn(0f, 1f); _volume.value = volume }
+    fun setBrightness(brightness: Float) { _brightness.value = brightness.coerceIn(-1f, 1f) }
+    
     fun disableSubtitles() {
-        val player = _player.value ?: return
-        val params = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-            .build()
-        player.trackSelectionParameters = params
+        _player.value?.let {
+            it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
+        }
     }
 
     fun selectSubtitleTrack(info: SubtitleTrackInfo) {
-        val player = _player.value ?: return
-        val group = player.currentTracks.groups.getOrNull(info.groupIndex) ?: return
-        val params = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-            .setOverrideForType(
-                TrackSelectionOverride(group.mediaTrackGroup, listOf(info.trackIndex))
-            )
-            .build()
-        player.trackSelectionParameters = params
+        _player.value?.let { player ->
+            val group = player.currentTracks.groups.getOrNull(info.groupIndex) ?: return
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, listOf(info.trackIndex)))
+                .build()
+        }
     }
 
-    // ✅ Fixed selectQuality with clearOverrides and correct TrackSelectionOverride
     fun selectQuality(quality: Quality) {
         val player = _player.value ?: return
-        val tracks = player.currentTracks
-
-        for (groupIndex in tracks.groups.indices) {
-            val trackGroup = tracks.groups[groupIndex]
+        for (groupIndex in player.currentTracks.groups.indices) {
+            val trackGroup = player.currentTracks.groups[groupIndex]
             if (trackGroup.type == C.TRACK_TYPE_VIDEO) {
                 val targetHeight = quality.resolution?.removeSuffix("p")?.toIntOrNull() ?: 0
                 var bestIndex = 0
                 var bestDiff = Int.MAX_VALUE
-
                 for (trackIndex in 0 until trackGroup.length) {
-                    val format = trackGroup.getTrackFormat(trackIndex)
-                    val height = format.height ?: 0
+                    val height = trackGroup.getTrackFormat(trackIndex).height ?: 0
                     val diff = kotlin.math.abs(height - targetHeight)
-                    if (diff < bestDiff) {
-                        bestDiff = diff
-                        bestIndex = trackIndex
-                    }
+                    if (diff < bestDiff) { bestDiff = diff; bestIndex = trackIndex }
                 }
-
-                // ✅ सही override
-                val override = TrackSelectionOverride(
-                    trackGroup.mediaTrackGroup,
-                    listOf(bestIndex)
-                )
-                val params = player.trackSelectionParameters.buildUpon()
-                    .clearOverridesOfType(C.TRACK_TYPE_VIDEO) // पुराने हटाएं
-                    .setOverrideForType(override)
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+                    .setOverrideForType(TrackSelectionOverride(trackGroup.mediaTrackGroup, listOf(bestIndex)))
                     .build()
-                player.trackSelectionParameters = params
                 return
             }
         }
     }
 
-    fun toggleLock() {
-        _isLocked.value = !_isLocked.value
-    }
-
-    fun toggleFullscreen() {
-        _isFullscreen.value = !_isFullscreen.value
-    }
+    fun toggleLock() { _isLocked.value = !_isLocked.value }
+    fun toggleFullscreen() { _isFullscreen.value = !_isFullscreen.value }
 
     fun releasePlayer() {
         positionJob?.cancel()
-        positionJob = null
-        playerListener?.let { listener ->
-            _player.value?.removeListener(listener)
-        }
+        playerListener?.let { _player.value?.removeListener(it) }
         _player.value?.release()
         _player.value = null
-        playerListener = null
     }
 }
