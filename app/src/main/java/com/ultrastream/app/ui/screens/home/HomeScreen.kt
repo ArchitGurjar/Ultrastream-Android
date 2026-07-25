@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.ultrastream.app.data.models.MetaItem  // ✅ Added
 import com.ultrastream.app.ui.components.ContinueWatchingCard
 import com.ultrastream.app.ui.components.HScrollRow
 import com.ultrastream.app.ui.components.PosterCard
@@ -20,7 +21,8 @@ import com.ultrastream.app.ui.components.SectionHeader
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
-    onItemClick: (id: String, type: String) -> Unit
+    onItemClick: (id: String, type: String) -> Unit,
+    onSeeAll: (rowId: String, items: List<MetaItem>, title: String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -46,7 +48,22 @@ fun HomeScreen(
             }
         }
 
-        // Recommended Addons
+        // ✅ RECOMMENDATIONS (Because you watched)
+        if (uiState.recommendations.isNotEmpty()) {
+            item {
+                SectionHeader(title = "🎯 Because you watched")
+                HScrollRow {
+                    uiState.recommendations.forEach { meta ->
+                        PosterCard(
+                            meta = meta,
+                            onClick = { onItemClick(meta.id, meta.type) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Recommended Addons (keep)
         item {
             SectionHeader(title = "Recommended Addons")
             if (uiState.recommendedAddons.isEmpty()) {
@@ -65,7 +82,7 @@ fun HomeScreen(
             }
         }
 
-        // Catalog rows
+        // Catalog rows with See All
         if (uiState.isLoading) {
             item {
                 Box(modifier = Modifier.fillParentMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -84,7 +101,11 @@ fun HomeScreen(
                         }
                         else -> "Catalog"
                     }
-                    SectionHeader(title = displayName)
+                    SectionHeader(
+                        title = displayName,
+                        actionText = "See All",
+                        onActionClick = { onSeeAll(rowId, items, displayName) }
+                    )
                     if (items.isEmpty()) {
                         Text("No items", modifier = Modifier.padding(horizontal = 16.dp))
                     } else {

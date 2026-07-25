@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -25,9 +24,11 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.hilt.android.AndroidEntryPoint
 import java.net.URLDecoder
+import com.ultrastream.app.data.models.MetaItem   // ✅ Added
 import com.ultrastream.app.data.models.StreamItem
 import com.ultrastream.app.ui.navigation.Screen
 import com.ultrastream.app.ui.screens.addons.AddonsScreen
+import com.ultrastream.app.ui.screens.catalog.CatalogScreen
 import com.ultrastream.app.ui.screens.details.DetailsScreen
 import com.ultrastream.app.ui.screens.home.HomeScreen
 import com.ultrastream.app.ui.screens.library.LibraryScreen
@@ -90,9 +91,15 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.padding(innerPadding)
             ) {
                 composable(Screen.Home.route) {
-                    HomeScreen { id, type ->
-                        navController.navigate(Screen.Details.pass(id, type))
-                    }
+                    HomeScreen(
+                        onItemClick = { id, type ->
+                            navController.navigate(Screen.Details.pass(id, type))
+                        },
+                        onSeeAll = { rowId, items, title ->
+                            CatalogDataHolder.items = items
+                            navController.navigate(Screen.Catalog.pass(rowId, title))
+                        }
+                    )
                 }
                 composable(Screen.Library.route) {
                     LibraryScreen { id, type ->
@@ -139,7 +146,31 @@ class MainActivity : ComponentActivity() {
                         navController.popBackStack()
                     }
                 }
+                // ✅ New Catalog route
+                composable(Screen.Catalog.route) { backStackEntry ->
+                    val rowId = URLDecoder.decode(backStackEntry.arguments?.getString("rowId") ?: "", "UTF-8")
+                    val title = URLDecoder.decode(backStackEntry.arguments?.getString("title") ?: "", "UTF-8")
+                    val items = CatalogDataHolder.items
+                    if (items.isNotEmpty()) {
+                        CatalogScreen(
+                            rowId = rowId,
+                            title = title,
+                            items = items,
+                            onBack = { navController.popBackStack() },
+                            onItemClick = { id, type ->
+                                navController.navigate(Screen.Details.pass(id, type))
+                            }
+                        )
+                    } else {
+                        navController.popBackStack()
+                    }
+                }
             }
         }
     }
+}
+
+// Temporary data holder for Catalog items
+object CatalogDataHolder {
+    var items: List<MetaItem> = emptyList()
 }

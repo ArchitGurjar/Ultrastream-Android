@@ -15,4 +15,9 @@ sealed class Screen(val route: String) {
     object Player : Screen("player/{title}") {
         fun pass(title: String) = "player/${URLEncoder.encode(title, "UTF-8")}"
     }
+    // ✅ New: Catalog screen for See All
+    object Catalog : Screen("catalog/{rowId}/{title}") {
+        fun pass(rowId: String, title: String) =
+            "catalog/${URLEncoder.encode(rowId, "UTF-8")}/${URLEncoder.encode(title, "UTF-8")}"
+    }
 }
