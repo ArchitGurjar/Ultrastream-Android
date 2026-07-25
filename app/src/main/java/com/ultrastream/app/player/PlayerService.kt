@@ -1,20 +1,11 @@
 package com.ultrastream.app.player
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
-import android.content.Intent
 import android.os.Build
-import android.os.IBinder
-import androidx.core.app.NotificationCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import com.ultrastream.app.MainActivity
 import com.ultrastream.app.R
 
 class PlayerService : MediaSessionService() {
@@ -53,6 +44,7 @@ class PlayerService : MediaSessionService() {
                 "ACTION_PLAY" -> player?.play()
                 "ACTION_PAUSE" -> player?.pause()
                 "ACTION_STOP" -> stopSelf()
+                else -> { /* do nothing */ }
             }
         }
         return START_STICKY

@@ -61,14 +61,38 @@ class MetaRepository @Inject constructor(
                         imdb_id = mergedMeta.imdb_id ?: meta.imdb_id
                     )
                 }
-                meta.videos?.let { allVideos.addAll(it) }
+                meta.videos?.let { netVideos ->
+                    allVideos.addAll(netVideos.map { netVideo ->
+                        Video(
+                            season = netVideo.season,
+                            episode = netVideo.episode,
+                            name = netVideo.name,
+                            title = netVideo.title,
+                            description = netVideo.description,
+                            thumbnail = netVideo.thumbnail,
+                            url = netVideo.url
+                        )
+                    })
+                }
             }
         }
 
         if (mergedMeta == null) return null
 
         val uniqueVideos = allVideos.distinctBy { it.season?.toString() + ":" + it.episode?.toString() + ":" + it.name }
-        val finalMeta = mergedMeta.copy(videos = uniqueVideos)
+        val finalMeta = mergedMeta.copy(
+            videos = uniqueVideos.map { video ->
+                com.ultrastream.app.network.Video(
+                    season = video.season,
+                    episode = video.episode,
+                    name = video.name,
+                    title = video.title,
+                    description = video.description,
+                    thumbnail = video.thumbnail,
+                    url = video.url
+                )
+            }
+        )
 
         val metaItem = convertToMetaItem(finalMeta)
         val json = moshi.adapter(MetaItem::class.java).toJson(metaItem)

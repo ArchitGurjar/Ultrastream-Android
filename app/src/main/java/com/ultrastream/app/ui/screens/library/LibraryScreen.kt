@@ -162,10 +162,7 @@ fun LibraryScreen(
     // Smart Playlist Detail Sheet
     if (showPlaylistDetail && selectedPlaylist != null) {
         val playlist = selectedPlaylist!!
-        // Parse episodes from playlist JSON using viewModel
-        val episodes = remember(playlist) {
-            viewModel.parsePlaylistEpisodes(playlist)
-        }
+        val episodes = viewModel.parsePlaylistEpisodes(playlist)
         SmartPlaylistDetailSheet(
             playlist = playlist,
             episodes = episodes,
@@ -179,9 +176,6 @@ fun LibraryScreen(
             onManualPick = { episode ->
                 scope.launch {
                     viewModel.manualPickEpisode(playlist, episode)
-                    // Don't dismiss to allow user to see the pick result, but we can close after selection
-                    // For simplicity, we'll close after selection, or we could open another sheet.
-                    // We'll just call the viewModel and keep sheet open until user dismisses manually.
                 }
             },
             onPlayEpisode = { episode ->

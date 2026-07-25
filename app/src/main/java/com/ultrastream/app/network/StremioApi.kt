@@ -1,5 +1,6 @@
 package com.ultrastream.app.network
 
+import com.ultrastream.app.data.models.Catalog
 import retrofit2.http.GET
 import retrofit2.http.Url
 

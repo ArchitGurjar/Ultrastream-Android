@@ -2,6 +2,7 @@ package com.ultrastream.app.data.repository
 
 import com.ultrastream.app.data.models.StreamItem
 import com.ultrastream.app.data.models.Subtitle
+import com.ultrastream.app.data.preferences.PreferencesManager
 import com.ultrastream.app.network.StremioApi
 import com.ultrastream.app.utils.DebridHelper
 import com.ultrastream.app.utils.LinkVerifier
@@ -17,7 +18,8 @@ class StreamRepository @Inject constructor(
     private val stremioApi: StremioApi,
     private val debridHelper: DebridHelper,
     private val linkVerifier: LinkVerifier,
-    private val streamParser: StreamParser
+    private val streamParser: StreamParser,
+    private val preferencesManager: PreferencesManager  // ✅ added
 ) {
 
     suspend fun getStreams(

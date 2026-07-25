@@ -1,6 +1,7 @@
 package com.ultrastream.app.player
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.content.Intent
 import android.net.Uri
@@ -8,6 +9,7 @@ import android.os.Build
 import android.util.Rational
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import com.ultrastream.app.MainActivity
 import com.ultrastream.app.R
 
 @UnstableApi

@@ -248,7 +248,7 @@ fun PlayerScreen(
                                     clipboard.setText(AnnotatedString(url))
                                     android.widget.Toast.makeText(context, "Magnet copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
                                 } else {
-                                    PlayerHelper.openInExternalPlayer(activity ?: context, url, title)
+                                    PlayerHelper.openInExternalPlayer(activity!!, url, title)
                                 }
                             }
                         }

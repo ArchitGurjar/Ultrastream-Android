@@ -38,11 +38,11 @@ class AddonRepository @Inject constructor(
                 id = netCat.id,
                 name = netCat.name,
                 extraSupported = netCat.extraSupported,
-                extra = netCat.extra?.map {
+                extra = netCat.extra?.map { extra ->
                     Extra(
-                        name = it.name,
-                        isRequired = it.isRequired,
-                        options = it.options
+                        name = extra.name,
+                        isRequired = extra.isRequired,
+                        options = extra.options
                     )
                 }
             )

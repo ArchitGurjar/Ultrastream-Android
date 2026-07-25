@@ -3,6 +3,7 @@ package com.ultrastream.app.ui.screens.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ultrastream.app.data.dao.*
+import com.ultrastream.app.data.models.Profile
 import com.ultrastream.app.data.preferences.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -22,7 +22,7 @@ class InstallAddonUseCase @Inject constructor(
         }
         // Ensure manifest.json is at the end
         if (!safeUrl.endsWith("/manifest.json") && !safeUrl.endsWith("manifest.json")) {
-            safeUrl = if (safeUrl.endsWith("/")) "$safeUrlmanifest.json" else "$safeUrl/manifest.json"
+            safeUrl = if (safeUrl.endsWith("/")) "$safeUrl" + "manifest.json" else "$safeUrl/manifest.json"
         }
         return addonRepository.installAddon(safeUrl)
     }
