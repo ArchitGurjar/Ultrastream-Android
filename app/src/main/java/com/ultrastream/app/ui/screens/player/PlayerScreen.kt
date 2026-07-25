@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.ultrastream.app.ui.screens.player
 
@@ -7,6 +7,7 @@ import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.os.Build
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,7 +56,7 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    val activity = context.findActivity()
+    val activity = context.findActivity() // ✅ हमेशा सही Activity
     val lifecycleOwner = LocalLifecycleOwner.current
     val clipboard = LocalClipboardManager.current
 
@@ -148,7 +149,7 @@ fun PlayerScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
                     useController = false
-                    this.resizeMode = resizeMode
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
             modifier = Modifier.fillMaxSize(),
@@ -238,14 +239,16 @@ fun PlayerScreen(
                             Icon(Icons.Default.PictureInPicture, contentDescription = "Picture in Picture", tint = Color.White)
                         }
                     }
+                    // Download / Open in external player
                     IconButton(
                         onClick = {
                             val url = stream.url ?: stream.streamUrl ?: stream.externalUrl
                             if (!url.isNullOrBlank()) {
                                 if (url.startsWith("magnet:")) {
                                     clipboard.setText(AnnotatedString(url))
+                                    android.widget.Toast.makeText(context, "Magnet copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
                                 } else {
-                                    PlayerHelper.openInExternalPlayer(activity ?: context as Activity, url, title)
+                                    PlayerHelper.openInExternalPlayer(activity ?: context, url, title)
                                 }
                             }
                         }
@@ -326,6 +329,25 @@ fun PlayerScreen(
                 }
                 IconButton(onClick = { showSubtitleSheet = true }) {
                     Icon(Icons.Default.ClosedCaption, contentDescription = "Subtitles", tint = Color.White)
+                }
+            }
+        }
+
+        if (error != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Text(
+                        text = "Error: $error",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
                 }
             }
         }

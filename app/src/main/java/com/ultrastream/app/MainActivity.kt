@@ -117,8 +117,8 @@ class MainActivity : ComponentActivity() {
                         type = type,
                         onBack = { navController.popBackStack() },
                         onPlay = { stream: StreamItem, title: String ->
-                            StreamDataHolder.setStream(stream)
-                            navController.navigate(Screen.Player.pass(title))
+                            StreamDataHolder.setStream(stream) // ✅ मेमोरी में सेव
+                            navController.navigate(Screen.Player.pass(title)) // ✅ सिर्फ टाइटल पास
                         }
                     )
                 }

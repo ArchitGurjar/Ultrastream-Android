@@ -3,13 +3,14 @@ package com.ultrastream.app.data.database
 import androidx.room.TypeConverter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.ultrastream.app.data.models.*
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class Converters {
-    private val moshi = Moshi.Builder()
-        .add(KotlinJsonAdapterFactory())
-        .build()
+@Singleton
+class Converters @Inject constructor(
+    private val moshi: Moshi
+) {
 
     @TypeConverter
     fun fromCatalogList(value: List<Catalog>): String {
@@ -26,16 +27,14 @@ class Converters {
     }
 
     @TypeConverter
-    fun fromStringList(value: List<String>?): String {
-        if (value == null) return "[]"
+    fun fromStringList(value: List<String>): String {
         val type = Types.newParameterizedType(List::class.java, String::class.java)
         val adapter = moshi.adapter<List<String>>(type)
         return adapter.toJson(value)
     }
 
     @TypeConverter
-    fun toStringList(value: String?): List<String> {
-        if (value.isNullOrBlank()) return emptyList()
+    fun toStringList(value: String): List<String> {
         val type = Types.newParameterizedType(List::class.java, String::class.java)
         val adapter = moshi.adapter<List<String>>(type)
         return adapter.fromJson(value) ?: emptyList()
