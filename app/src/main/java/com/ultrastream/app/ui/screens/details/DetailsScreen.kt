@@ -309,7 +309,7 @@ fun DetailsScreen(
                                     progressPercent = progressPercent,
                                     onClick = {
                                         viewModel.selectEpisode(epNum)
-                                        viewModel.loadStreams(meta.id, meta.type, seasonNum, epNum)
+                                        viewModel.loadStreams(meta?.id ?: "", meta?.type ?: "", seasonNum, epNum)
                                         showStreamsSheet = true
                                     }
                                 )

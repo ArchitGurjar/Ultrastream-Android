@@ -1,6 +1,8 @@
 package com.ultrastream.app.ui.screens.addons
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -19,6 +21,8 @@ import kotlinx.coroutines.launch
 import com.ultrastream.app.data.models.RecommendedAddon
 import com.ultrastream.app.ui.components.RecommendedAddonCard
 import com.ultrastream.app.ui.components.HScrollRow
+import java.io.File
+import java.io.InputStreamReader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,11 +33,35 @@ fun AddonsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    
+
     var addonUrl by remember { mutableStateOf("") }
     var debridKey by remember { mutableStateOf(uiState.debridKey) }
     var selectedProvider by remember { mutableStateOf(uiState.debridProvider) }
-    var jsonInputText by remember { mutableStateOf("") }
+
+    // File picker launcher for import
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val reader = InputStreamReader(inputStream)
+                val json = reader.readText()
+                reader.close()
+                inputStream?.close()
+                scope.launch {
+                    val success = viewModel.importAddonsJson(json)
+                    if (success) {
+                        Toast.makeText(context, "✅ Addons Imported!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "❌ Invalid JSON format.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to read file: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -43,7 +71,7 @@ fun AddonsScreen(
         item {
             Text("Addons", style = MaterialTheme.typography.headlineMedium)
         }
-        
+
         // Addon URL Installation
         item {
             OutlinedTextField(
@@ -105,19 +133,15 @@ fun AddonsScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Sync / Backup
+        // Sync / Backup – now with Import/Export buttons
         item {
             Text("Sync / Backup", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
-                value = jsonInputText,
-                onValueChange = { jsonInputText = it },
-                label = { Text("Paste Import JSON here") },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                minLines = 3,
-                maxLines = 5
-            )
             Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Export JSON to clipboard (kept)
                 Button(
                     onClick = {
                         val json = viewModel.exportAddonsJson()
@@ -128,28 +152,45 @@ fun AddonsScreen(
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Export JSON")
+                    Text("Copy JSON")
                 }
+                // Export to file – we'll use the same JSON but write to a file and share
                 Button(
                     onClick = {
-                        if (jsonInputText.isBlank()) {
-                            Toast.makeText(context, "Paste JSON code first!", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        scope.launch {
-                            val success = viewModel.importAddonsJson(jsonInputText)
-                            if (success) {
-                                jsonInputText = ""
-                                Toast.makeText(context, "✅ Addons Imported!", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "❌ Invalid JSON format.", Toast.LENGTH_SHORT).show()
+                        val json = viewModel.exportAddonsJson()
+                        if (json.isNotBlank()) {
+                            try {
+                                val file = File(context.cacheDir, "addons_backup.json")
+                                file.writeText(json)
+                                // Share the file
+                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    file
+                                )
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "application/json"
+                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Export Addons"))
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Import JSON")
+                    Text("Export File")
                 }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            // Import from file button
+            Button(
+                onClick = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Import JSON from File")
             }
         }
 
@@ -233,9 +274,9 @@ fun AddonsScreen(
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                         Text(addon.name, style = MaterialTheme.typography.titleSmall)
                         Text(
-                            text = addon.url, 
-                            style = MaterialTheme.typography.bodySmall, 
-                            maxLines = 1, 
+                            text = addon.url,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }

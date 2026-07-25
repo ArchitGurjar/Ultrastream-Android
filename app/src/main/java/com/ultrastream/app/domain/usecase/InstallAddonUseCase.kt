@@ -10,17 +10,18 @@ class InstallAddonUseCase @Inject constructor(
     private val addonRepository: AddonRepository
 ) {
     suspend operator fun invoke(rawUrl: String): Addon? {
-        // Normalize URL
         var safeUrl = rawUrl.trim()
+        // Normalize stremio:// to https://
         if (safeUrl.startsWith("stremio://")) {
             safeUrl = safeUrl.replace("stremio://", "https://")
-        } else if (!safeUrl.startsWith("http")) {
+        } else if (!safeUrl.startsWith("http://") && !safeUrl.startsWith("https://")) {
             safeUrl = "https://$safeUrl"
         }
+        // Remove trailing slash
         if (safeUrl.endsWith("/")) {
             safeUrl = safeUrl.dropLast(1)
         }
-        // Ensure manifest.json is at the end
+        // Ensure manifest.json
         if (!safeUrl.endsWith("/manifest.json") && !safeUrl.endsWith("manifest.json")) {
             safeUrl = if (safeUrl.endsWith("/")) "$safeUrl" + "manifest.json" else "$safeUrl/manifest.json"
         }
