@@ -66,6 +66,8 @@ fun DetailsScreen(
     var showSubtitlesSheet by remember { mutableStateOf(false) }
     var selectedStream by remember { mutableStateOf<StreamItem?>(null) }
     var subtitlesList by remember { mutableStateOf<List<Subtitle>>(emptyList()) }
+    // ✅ FIX: add streamsRequested flag
+    var streamsRequested by remember { mutableStateOf(false) }
 
     val meta = uiState.meta
     val filteredEpisodes by viewModel.filteredEpisodes.collectAsState()
@@ -84,6 +86,13 @@ fun DetailsScreen(
             if (seasons.isNotEmpty() && uiState.selectedSeason == null) {
                 viewModel.selectSeasonAndLoad(seasons.first())
             }
+        }
+    }
+
+    // ✅ FIX: open streams sheet only after loading finishes
+    LaunchedEffect(uiState.streamsLoading, streamsRequested) {
+        if (!uiState.streamsLoading && streamsRequested && uiState.streams.isNotEmpty()) {
+            showStreamsSheet = true
         }
     }
 
@@ -218,7 +227,8 @@ fun DetailsScreen(
                                 Button(
                                     onClick = {
                                         viewModel.loadStreams(meta.id, meta.type, null, null)
-                                        showStreamsSheet = true
+                                        // ✅ FIX: use streamsRequested instead of directly opening sheet
+                                        streamsRequested = true
                                     },
                                     modifier = Modifier.fillMaxWidth().height(56.dp),
                                     shape = RoundedCornerShape(50),
@@ -307,10 +317,16 @@ fun DetailsScreen(
                                     video = video,
                                     isWatched = isWatched,
                                     progressPercent = progressPercent,
+                                    // ✅ FIX: null-safe onClick with streamsRequested
                                     onClick = {
-                                        viewModel.selectEpisode(epNum)
-                                        viewModel.loadStreams(meta?.id ?: "", meta?.type ?: "", seasonNum, epNum)
-                                        showStreamsSheet = true
+                                        val currentMeta = uiState.meta
+                                        if (currentMeta != null) {
+                                            viewModel.selectEpisode(epNum)
+                                            viewModel.loadStreams(currentMeta.id, currentMeta.type, seasonNum, epNum)
+                                            streamsRequested = true
+                                        } else {
+                                            Toast.makeText(context, "Metadata not loaded", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -335,7 +351,10 @@ fun DetailsScreen(
     if (showStreamsSheet && uiState.streams.isNotEmpty()) {
         StreamsSheet(
             streams = uiState.streams,
-            onDismiss = { showStreamsSheet = false },
+            onDismiss = {
+                showStreamsSheet = false
+                streamsRequested = false // reset flag
+            },
             onStreamClick = { stream ->
                 showStreamsSheet = false
                 selectedStream = stream

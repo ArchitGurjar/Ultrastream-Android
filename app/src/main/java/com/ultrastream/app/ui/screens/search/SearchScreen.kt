@@ -24,7 +24,7 @@ fun SearchScreen(
     var filter by remember { mutableStateOf("all") }
     var sort by remember { mutableStateOf("popular") }
 
-    // When filter or sort changes and query is not empty, re-search
+    // ✅ FIX: जब filter या sort change हो, तो search re-trigger करें
     LaunchedEffect(filter, sort) {
         if (query.isNotBlank()) {
             viewModel.search(query, filter, sort)
@@ -42,7 +42,7 @@ fun SearchScreen(
                 query = it
                 viewModel.search(it, filter, sort)
             },
-            label = { Text("Search movies, series...") },
+            label = { Text("Search movies, series, anime, TV...") },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -51,7 +51,7 @@ fun SearchScreen(
             selected = filter,
             onSelect = {
                 filter = it.lowercase()
-                // LaunchedEffect will trigger search
+                // LaunchedEffect will re-trigger search
             }
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -60,7 +60,7 @@ fun SearchScreen(
             selected = sort,
             onSelect = {
                 sort = it.lowercase()
-                // LaunchedEffect will trigger search
+                // LaunchedEffect will re-trigger search
             }
         )
         Spacer(modifier = Modifier.height(8.dp))
