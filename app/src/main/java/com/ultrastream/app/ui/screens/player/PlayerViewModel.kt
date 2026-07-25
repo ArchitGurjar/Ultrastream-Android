@@ -20,6 +20,7 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.session.MediaSession // ✅ नया import
 import com.ultrastream.app.data.models.StreamItem
 import com.ultrastream.app.data.models.Subtitle
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -89,13 +90,14 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
     private var currentContext: Context? = null
     private var currentStream: StreamItem? = null
     private var currentTitle: String? = null
+    private var mediaSession: MediaSession? = null // ✅ नया वेरिएबल
 
     fun initializePlayer(context: Context, stream: StreamItem, title: String, externalSubtitle: Subtitle? = null) {
         currentContext = context
         currentStream = stream
         currentTitle = title
 
-        // ✅ Volume fix: initialize with current system volume
+        // Volume fix: initialize with current system volume
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -161,6 +163,9 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
                 exoPlayer.setMediaSource(mediaSource)
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
+
+                // ✅ MediaSession बनाएं ताकि नोटिफिकेशन और लॉक-स्क्रीन कंट्रोल्स काम करें
+                mediaSession = MediaSession.Builder(context, exoPlayer).build()
 
                 _player.value = exoPlayer
                 _title.value = title
@@ -377,7 +382,6 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
         player.trackSelectionParameters = params
     }
 
-    // ✅ Fixed selectQuality with clearOverrides and correct TrackSelectionOverride
     fun selectQuality(quality: Quality) {
         val player = _player.value ?: return
         val tracks = player.currentTracks
@@ -399,13 +403,12 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
                     }
                 }
 
-                // ✅ सही override
                 val override = TrackSelectionOverride(
                     trackGroup.mediaTrackGroup,
                     listOf(bestIndex)
                 )
                 val params = player.trackSelectionParameters.buildUpon()
-                    .clearOverridesOfType(C.TRACK_TYPE_VIDEO) // पुराने हटाएं
+                    .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
                     .setOverrideForType(override)
                     .build()
                 player.trackSelectionParameters = params
@@ -431,5 +434,9 @@ class PlayerViewModel @Inject constructor() : ViewModel() {
         _player.value?.release()
         _player.value = null
         playerListener = null
+
+        // ✅ MediaSession को रिलीज़ करें
+        mediaSession?.release()
+        mediaSession = null
     }
 }

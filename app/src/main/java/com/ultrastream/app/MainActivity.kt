@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -13,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.vectorResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -58,15 +59,15 @@ class MainActivity : ComponentActivity() {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
                     val items = listOf(
-                        Triple(Screen.Home, "Home", R.drawable.ic_home),
-                        Triple(Screen.Library, "Library", R.drawable.ic_library),
-                        Triple(Screen.Search, "Search", R.drawable.ic_search),
-                        Triple(Screen.Addons, "Addons", R.drawable.ic_addon),
-                        Triple(Screen.Profile, "Profile", R.drawable.ic_profile)
+                        Triple(Screen.Home, "Home", Icons.Default.Home),
+                        Triple(Screen.Library, "Library", Icons.Default.VideoLibrary),
+                        Triple(Screen.Search, "Search", Icons.Default.Search),
+                        Triple(Screen.Addons, "Addons", Icons.Default.Extension),
+                        Triple(Screen.Profile, "Profile", Icons.Default.Person)
                     )
-                    items.forEach { (screen, title, iconRes) ->
+                    items.forEach { (screen, title, iconVector) ->
                         NavigationBarItem(
-                            icon = { Icon(imageVector = ImageVector.vectorResource(id = iconRes), contentDescription = title) },
+                            icon = { Icon(imageVector = iconVector, contentDescription = title) },
                             label = { Text(title) },
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                             onClick = {
@@ -117,8 +118,8 @@ class MainActivity : ComponentActivity() {
                         type = type,
                         onBack = { navController.popBackStack() },
                         onPlay = { stream: StreamItem, title: String ->
-                            StreamDataHolder.setStream(stream) // ✅ मेमोरी में सेव
-                            navController.navigate(Screen.Player.pass(title)) // ✅ सिर्फ टाइटल पास
+                            StreamDataHolder.setStream(stream)
+                            navController.navigate(Screen.Player.pass(title))
                         }
                     )
                 }
