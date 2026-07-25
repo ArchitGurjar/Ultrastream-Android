@@ -1,4 +1,5 @@
 package com.ultrastream.app.data.repository
+import kotlinx.coroutines.flow.first
 
 import com.ultrastream.app.data.models.StreamItem
 import com.ultrastream.app.data.models.Subtitle
