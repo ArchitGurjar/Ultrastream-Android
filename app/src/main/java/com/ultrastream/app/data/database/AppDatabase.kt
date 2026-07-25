@@ -21,7 +21,6 @@ import com.ultrastream.app.data.models.*
     version = 1,
     exportSchema = false
 )
-@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun addonDao(): AddonDao
     abstract fun libraryDao(): LibraryDao
